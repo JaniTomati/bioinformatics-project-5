@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import io
+import copy
 import numpy as np
+import networkx as nx
 from Bio import Phylo
 
 
@@ -30,42 +32,29 @@ def load_distance_matrix(file):
         return np.array(D), taxa
 
 
-def calculate_Q(D):
-    """ Calculate the Q-matrix based on our distance matrix D """
-    Q = np.zeros(D.shape)
+def calculate_matrix_N(D):
+    """ Calculate N as defined by Saitou and Nei """
+    N = np.zeros(D.shape)
     n, m = D.shape
 
     for i in range(n):
         for j in range(m):
-            Q[i, j] = (n - 2) * D[i, j] - sum(D[i, k] for k in range(n)) - sum(D[j, k] for k in range(n))
+            if i != j:
+                N[i, j] = D[i, j] - (1 / (n - 2) * sum(D[i, k] for k in range(n)) + 1 / (n - 2) * sum(D[j, k] for k in range(n)))
 
-    return Q
+    return N
 
 
-def find_minimum_Q(Q):
-    """ Find the pair of nodes for which Q is minimized """
-    n, m = Q.shape
+def find_neighbors(N):
+    """ Find a pair of neighbors which minimized Nij as defined by Saitou and Nei """
+    n, m = N.shape
 
     min = float('inf')
     pair = None
     for i in range(n):
         for j in range(m):
-            if Q[i, j] < min:
-                min = Q[i, j]
-                pair = (i, j)
-
-    return pair
-
-
-def select_nearest_pair(D):
-    n, m = D.shape
-
-    min = float('inf')
-    pair = None
-    for i in range(n):
-        for j in range(m):
-            if D[i, j] < min and i != j:
-                min = D[i, j]
+            if N[i, j] < min and i != j:
+                min = N[i, j]
                 pair = (i, j)
 
     return pair
@@ -83,18 +72,60 @@ def create_tree(T):
     return Phylo.read(io.StringIO(tree), "newick")
 
 
-def generic_neighbor_joining(D, taxa):
+def update_dissimilarity_matrix(D, i, j):
+    """ Update the dissamilarity matrix """
+    D_ = np.delete(D, i, 0)
+    D_ = np.delete(D_, i, 1)
+    D_ = np.delete(D_, j - 1, 0) # -1 since we already deleted i from the matrix
+    D_ = np.delete(D_, j - 1, 1)
+
+    n, _ = D_.shape
+    new = []
+    for m in range(n):
+        new.append(1 / 2 * (D[i, m] + D[j, m] - D[i, j]))
+
+    new.append(0.0)
+
+    D = np.zeros((n + 1, n + 1))
+    D[:n, :n] = D_
+    D[-1, :] = np.array(new)
+    D[:, -1] = np.array(new)
+
+    return D
+
+
+def update_taxa(S, i, j):
+    """ Update new list of taxa """
+    taxon_i = S[i]
+    taxon_j = S[j]
+
+    # remove old nodes
+    S.remove(taxon_i)
+    S.remove(taxon_j)
+
+    # add new taxon "k"
+    S.append(taxon_i + taxon_j)
+
+    return S
+
+
+def neighbor_joining(D, taxa):
     """ Creates an unrooted binary tree such that similar species are grouped in the
         same sub tree and the tree distances correspond to the distance matrix if possible """
-    S = taxa
-    Q = calculate_Q(D)
-    print(select_nearest_pair(D))
-
-    print(create_tree(taxa))
-    Phylo.draw(create_tree(taxa))
+    S = copy.deepcopy(taxa)
+    # tree = create_tree(taxa)
+    # Phylo.draw(tree)
+    # Phylo.draw_ascii(tree)
 
     while len(S) > 3:
-        break
+        N = calculate_matrix_N(D)
+        i, j = find_neighbors(N)
+
+        S = update_taxa(S, i, j)
+        print(S)
+        D = update_dissimilarity_matrix(D, i, j)
+
+    print(D)
 
     return 0
 
@@ -102,7 +133,7 @@ def generic_neighbor_joining(D, taxa):
 def main():
     D, taxa  = load_distance_matrix("example_slide4.phy")
 
-    nj = generic_neighbor_joining(D, taxa)
+    nj = neighbor_joining(D, taxa)
 
 
 
