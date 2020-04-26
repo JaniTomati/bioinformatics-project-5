@@ -52,8 +52,8 @@ def find_neighbors(N):
     min = float('inf')
     pair = None
     for i in range(n):
-        for j in range(m):
-            if N[i, j] < min and i != j:
+        for j in range(n):
+            if N[i, j] < min:
                 min = N[i, j]
                 pair = (i, j)
 
@@ -110,7 +110,6 @@ def update_S(S, i, j):
 
     # add new taxon "k"
     S.append(taxon_i + taxon_j)
-
     return S
 
 
@@ -126,8 +125,6 @@ def tree_object(taxa):
 def update_tree_object(tree_obj, taxa, i, j, S, D):
     """ Insert new nodes and update properties of the old nodes """
     n, _ = D.shape
-
-    print(taxa[i], taxa[j])
 
     # add new taxon
     tree_obj[taxa[i] + taxa[j]] = ["root", 0.0]
@@ -199,11 +196,16 @@ def neighbor_joining(D, taxa):
 
     # Add new node v and edges to the tree
     tree_obj = last_update_tree_obj(tree_obj, S, D)
+    print(tree_obj)
     return convert_to_newick_format(tree_obj)
 
 
 def main():
-    D, taxa  = load_distance_matrix("example_slide4.phy")
+    file = "example_slide4.phy"
+    print("Reading from " + file + ".\n")
+    D, taxa  = load_distance_matrix(file)
+    print(taxa)
+    print(D, "\n")
 
     nj = neighbor_joining(D, taxa)
 
