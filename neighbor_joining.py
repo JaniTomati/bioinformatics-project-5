@@ -35,12 +35,12 @@ def load_distance_matrix(file):
 def calculate_matrix_N(D, S):
     """ Calculate N as defined by Saitou and Nei """
     N = np.zeros(D.shape)
-    n, m = D.shape
+    n, _ = D.shape
 
     for i in range(n):
-        for j in range(m):
+        for j in range(n):
             if i != j:
-                N[i, j] = D[i, j] - (1 / (len(S) - 2) * sum(D[i, k] for k in range(n)) + 1 / (len(S) - 2) * sum(D[j, k] for k in range(n)))
+                N[i, j] = D[i, j] - (1 / (len(S) - 2) * sum(D[i, m] for m in range(n)) + 1 / (len(S) - 2) * sum(D[j, m] for m in range(n)))
 
     return N
 
@@ -60,43 +60,23 @@ def find_neighbors(N):
     return pair
 
 
-def create_newick_tree(T):
-    """ Create a tree in newick format from the initial list of taxa """
-    tree = "("
-    for taxon in T:
-        if taxon != T[-1]:
-            tree += taxon + ", "
-        else:
-            tree += taxon + ")"
-
-    return tree
-    # return Phylo.read(io.StringIO(tree), "newick")
-
-
 def update_dissimilarity_matrix(D, i, j):
     """ Update the dissamilarity matrix """
-    shift = -1
-    if i > j:
-        shift = 0
-
     D_ = np.delete(D, i, 0)
     D_ = np.delete(D_, i, 1)
-    D_ = np.delete(D_, j + shift, 0) # shift j one to the left if i was already deleted
-    D_ = np.delete(D_, j + shift, 1)
+    D_ = np.delete(D_, j - 1, 0) # shift j one to the left if i was already deleted
+    D_ = np.delete(D_, j - 1, 1)
 
     n, _ = D_.shape
-    new = []
+
+    D_new = np.zeros((n + 1, n + 1)) # append new row and column to D_
+    D_new[:n, :n] = D_
+
     for m in range(n):
-        new.append(1 / 2 * (D[i, m] + D[j, m] - D[i, j]))
+        new_value = 1 / 2 * (D[i, m] + D[j, m] - D[i, j])
+        D_new[-1, m], D_new[m, -1]= new_value, new_value
 
-    new.append(0.0)
-
-    D = np.zeros((n + 1, n + 1))
-    D[:n, :n] = D_
-    D[-1, :] = np.array(new)
-    D[:, -1] = np.array(new)
-
-    return D
+    return D_new
 
 
 def update_S(S, i, j):
@@ -122,18 +102,18 @@ def tree_object(taxa):
     return tree
 
 
-def update_tree_object(tree_obj, taxa, i, j, S, D):
+def update_tree_object(tree_obj, i, j, S, D):
     """ Insert new nodes and update properties of the old nodes """
     n, _ = D.shape
 
     # add new taxon
-    tree_obj[taxa[i] + taxa[j]] = ["root", 0.0]
+    tree_obj[S[i] + S[j]] = ["root", 0.0]
 
     # update old taxons with new parent and edge weights
     edge_weight = 1/2 * (D[i, j] + 1 / (len(S) - 2) * (1 / (len(S) - 2)) * sum(D[i, k] for k in range(n)))
-    tree_obj[taxa[i]] = [taxa[i] + taxa[j], edge_weight]
+    tree_obj[S[i]] = [S[i] + S[j], edge_weight]
     edge_weight = D[i, j] - edge_weight
-    tree_obj[taxa[j]] = [taxa[i] + taxa[j], edge_weight]
+    tree_obj[S[j]] = [S[i] + S[j], edge_weight]
 
     return tree_obj
 
@@ -166,6 +146,7 @@ def last_update_tree_obj(tree_obj, S, D):
 
 def convert_to_newick_format(tree):
     """ Convert the tree object to newick format """
+    # return Phylo.read(io.StringIO(tree), "newick")
     return 0
 
 
@@ -174,8 +155,6 @@ def neighbor_joining(D, taxa):
         same sub tree and the tree distances correspond to the distance matrix if possible """
     S = copy.deepcopy(taxa)
     tree_obj = tree_object(taxa)
-    # Phylo.draw(tree)
-    # Phylo.draw_ascii(tree)
 
     while len(S) > 3:
         # 1. a) Compute matrix N
@@ -186,7 +165,7 @@ def neighbor_joining(D, taxa):
 
         # 2. Add new node k to the tree
         # 3. Add edges with weights to the tree
-        tree_obj = update_tree_object(tree_obj, taxa, i, j, S, D)
+        tree_obj = update_tree_object(tree_obj, i, j, S, D)
 
         # 4. Update the dissimilarity matrix
         D = update_dissimilarity_matrix(D, i, j)
@@ -201,14 +180,19 @@ def neighbor_joining(D, taxa):
 
 
 def main():
+    # read in the dissimilarity matrix
     file = "example_slide4.phy"
     print("Reading from " + file + ".\n")
     D, taxa  = load_distance_matrix(file)
     print(taxa)
     print(D, "\n")
 
-    nj = neighbor_joining(D, taxa)
+    # run the neighbor joining algorithm
+    nj_tree = neighbor_joining(D, taxa)
 
+    # draw the tree
+    # Phylo.draw(tree)
+    # Phylo.draw_ascii(tree)
 
 
 if __name__ == '__main__':
