@@ -73,18 +73,6 @@ def create_newick_tree(T):
     # return Phylo.read(io.StringIO(tree), "newick")
 
 
-def create_tree_graph(taxa):
-    """ Create a graph that represents our tree """
-    tree = nx.Graph()
-    tree.add_node("root") # insert a dummy root node which will be deleted later
-    tree.add_nodes_from(taxa)
-
-    for taxon in taxa:
-        tree.add_edge("root", taxon) # connect each taxon to the root
-
-    return tree
-
-
 def update_dissimilarity_matrix(D, i, j):
     """ Update the dissamilarity matrix """
     shift = -1
@@ -126,26 +114,69 @@ def update_S(S, i, j):
     return S
 
 
-def update_tree(tree, taxa, i, j, D):
-    """ Delete old nodes  and insert new nodes into the tree model """
-    print(tree.nodes())
-    tree.remove_node(taxa[i])
-    tree.remove_node(taxa[j])
+def tree_object(taxa):
+    """ Save name, parent and edge_weight for each taxon """
+    tree = {}
+    for taxon in taxa:
+        tree[taxon] = ["root", 0.0]
 
-    tree.add_node(taxa[-1])
-    tree.add_node(taxa[i])
-    tree.add_node(taxa[j])
+    return tree
 
-    # weight_i = 1 / 2 * (D[i, j] + )
-    # weight_j =
 
+def update_tree_object(tree_obj, taxa, i, j, S, D):
+    """ Insert new nodes and update properties of the old nodes """
+    n, _ = D.shape
+
+    print(taxa[i], taxa[j])
+
+    # add new taxon
+    tree_obj[taxa[i] + taxa[j]] = ["root", 0.0]
+
+    # update old taxons with new parent and edge weights
+    edge_weight = 1/2 * (D[i, j] + 1 / (len(S) - 2) * (1 / (len(S) - 2)) * sum(D[i, k] for k in range(n)))
+    tree_obj[taxa[i]] = [taxa[i] + taxa[j], edge_weight]
+    edge_weight = D[i, j] - edge_weight
+    tree_obj[taxa[j]] = [taxa[i] + taxa[j], edge_weight]
+
+    return tree_obj
+
+
+def calculate_edge_weight(i, j, m, D):
+    """ Calculate the weight after the termination of the while loop """
+    return (D[i, j] + D[i, m] - D[j, m]) / 2
+
+
+def last_update_tree_obj(tree_obj, S, D):
+    """ Update tree after while loop has terminated """
+    # Add new node v
+    v = ""
+    for taxon in S:
+        v += taxon
+    tree_obj[v] = ["root", 0.0]
+
+    # Add new weights
+    edge_weight = D[0, 1] + D[0, 2] - D[1, 2]
+    tree_obj[S[0]] = [v, edge_weight]
+
+    edge_weight = D[0, 1] + D[1, 2] - D[0, 2]
+    tree_obj[S[1]] = [v, edge_weight]
+
+    edge_weight = D[0, 2] + D[1, 2] - D[0, 1]
+    tree_obj[S[2]] = [v, edge_weight]
+
+    return tree_obj
+
+
+def convert_to_newick_format(tree):
+    """ Convert the tree object to newick format """
+    return 0
 
 
 def neighbor_joining(D, taxa):
     """ Creates an unrooted binary tree such that similar species are grouped in the
         same sub tree and the tree distances correspond to the distance matrix if possible """
     S = copy.deepcopy(taxa)
-    tree = create_tree_graph(taxa) # create a newick format from the given taxa
+    tree_obj = tree_object(taxa)
     # Phylo.draw(tree)
     # Phylo.draw_ascii(tree)
 
@@ -156,9 +187,9 @@ def neighbor_joining(D, taxa):
         # 1. b) Select i, j such that it is a minimum entry in N
         i, j = find_neighbors(N)
 
-        # 2. Add node k to the tree
-
+        # 2. Add new node k to the tree
         # 3. Add edges with weights to the tree
+        tree_obj = update_tree_object(tree_obj, taxa, i, j, S, D)
 
         # 4. Update the dissimilarity matrix
         D = update_dissimilarity_matrix(D, i, j)
@@ -166,12 +197,9 @@ def neighbor_joining(D, taxa):
         # 5. Delete i and j from S and append the new taxon k
         S = update_S(S, i, j)
 
-    # Add new node v
-
-
-    # Add edges to the tree
-
-    return 0
+    # Add new node v and edges to the tree
+    tree_obj = last_update_tree_obj(tree_obj, S, D)
+    return convert_to_newick_format(tree_obj)
 
 
 def main():
