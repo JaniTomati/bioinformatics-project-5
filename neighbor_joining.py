@@ -60,26 +60,6 @@ def find_neighbors(N):
     return pair
 
 
-def update_dissimilarity_matrix(D, i, j):
-    """ Update the dissamilarity matrix """
-    # delete rows and columns for i and j
-    D_reduced = np.delete(D, i, 0)
-    D_reduced = np.delete(D_reduced, i, 1)
-    D_reduced = np.delete(D_reduced, j - 1, 0) # reduce j by one since i was already deleted
-    D_reduced = np.delete(D_reduced, j - 1, 1)
-
-    n, _ = D_reduced.shape
-
-    D_new = np.zeros((n + 1, n + 1)) # create D_new that with one more row and column
-    D_new[:n, :n] = D_reduced # fill D_new with D_reduced
-
-    for m in range(n):
-        new_vec = 0.5 * (D[i, m] + D[j, m] - D[i, j])
-        D_new[-1, m], D_new[m, -1]= new_vec, new_vec
-
-    return D_new
-
-
 def update_S(S, i, j):
     """ Update new list of taxa """
     taxon_i = S[i]
@@ -92,6 +72,30 @@ def update_S(S, i, j):
     # add new taxon "k" = str(i) + str(j)
     S.append(taxon_i + taxon_j)
     return S
+
+
+def update_dissimilarity_matrix(S, D, i, j):
+    """ Update the dissamilarity matrix """
+    # delete rows and columns for i and j
+    D_reduced = np.delete(D, i, 0)
+    D_reduced = np.delete(D_reduced, i, 1)
+    D_reduced = np.delete(D_reduced, j - 1, 0) # reduce j by if i was already deleted in an index before j
+    D_reduced = np.delete(D_reduced, j - 1, 1)
+
+    n, _ = D_reduced.shape # dimensions without i and j
+    D_new = np.zeros((n + 1, n + 1)) # create D_new that with one more row and column
+    D_new[:n, :n] = D_reduced # fill D_new with D_reduced
+
+    l, _ = D.shape # original dimensions
+    new_row_column = []
+    for m in range(l):
+        if m != i and m != j:
+            new_row_column.append(0.5 * (D[i, m] + D[j, m] - D[i, j]))
+
+    new_row_column.append(0.0) # append 0.0 for new taxon in D
+    D_new[-1, :], D_new[:, -1]= new_row_column, new_row_column # set new row and column
+
+    return D_new
 
 
 def r(i, S, D):
@@ -164,6 +168,13 @@ def neighbor_joining(D, taxa):
     tree_obj = tree_object(taxa)
 
     while len(S) > 3:
+        # print information about the dissimilarity matrix
+        print("--------------------------")
+        print("Dissimilarity matrix")
+        print(S)
+        print(D)
+        print("--------------------------\n")
+
         # 1. a) Compute matrix N
         N = calculate_matrix_N(S, D)
         print("--------------------------")
@@ -173,8 +184,9 @@ def neighbor_joining(D, taxa):
 
         # 1. b) Select i, j such that it is a minimum entry in N
         i, j = find_neighbors(N)
-        print("\nDeleting indices " + taxa[i] + " and " + taxa[j] + " from D.")
-        print("Creating new taxon " + "'" + taxa[i] + taxa[j] + "'.")
+
+        print("\nDeleting indices " + str(i) + " (" + S[i] + ") " + "and " + str(j)  + " (" + S[j] + ") " + "from D.")
+        print("Creating new taxon " + "'" + S[i] + S[j] + "'.")
         print("--------------------------\n")
 
         # 2. Add new node k to the tree
@@ -182,14 +194,14 @@ def neighbor_joining(D, taxa):
         tree_obj = update_tree_object(tree_obj, i, j, S, D)
 
         # 4. Update the dissimilarity matrix
-        D = update_dissimilarity_matrix(D, i, j)
+        D = update_dissimilarity_matrix(S, D, i, j)
 
         # 5. Delete i and j from S and append the new taxon k
         S = update_S(S, i, j)
 
     # Add new node v and edges to the tree
     tree_obj = last_update_tree_obj(tree_obj, S, D)
-    print(tree_obj)
+    # print(tree_obj)
     return convert_to_newick_format(tree_obj)
 
 
@@ -198,14 +210,6 @@ def main():
     file = "example_slide4.phy"
     print("Reading from " + file + ".\n")
     D, taxa  = load_distance_matrix(file)
-
-    # print information about the dissimilarity matrix
-    print("--------------------------")
-    print("Dissimilarity matrix")
-    print(taxa)
-    print(D)
-    print("--------------------------\n")
-
 
     # run the neighbor joining algorithm
     nj_tree = neighbor_joining(D, taxa)
