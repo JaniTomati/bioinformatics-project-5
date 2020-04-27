@@ -135,9 +135,9 @@ def calculate_edge_weight(i, j, m, D):
 def last_update_tree(leaves, S, D):
     """ Update tree after while loop has terminated """
     # Add nodes and children
-    edge_weight_i = D[0, 1] + D[0, 2] - D[1, 2]
-    edge_weight_j = D[0, 1] + D[1, 2] - D[0, 2]
-    edge_weight_k = D[0, 2] + D[1, 2] - D[0, 1]
+    edge_weight_i = (D[0, 1] + D[0, 2] - D[1, 2]) / 2
+    edge_weight_j = (D[0, 1] + D[1, 2] - D[0, 2]) / 2
+    edge_weight_k = (D[0, 2] + D[1, 2] - D[0, 1]) / 2
 
     # Add new node v
     leaves[S[0]+S[1]+S[2]] = [(S[0], edge_weight_i, leaves[S[0]]), (S[1], edge_weight_j, leaves[S[1]]), (S[2], edge_weight_k, leaves[S[2]])]
@@ -148,9 +148,37 @@ def last_update_tree(leaves, S, D):
     return leaves
 
 
+def find_leaves(leaf, children):
+    string = ""
+    for child in children:
+        if len(child[2]) != 0:
+            string += find_leaves(child[0], child[2])
+        else:
+            string += "(" + child[0] + ":" + str(child[1]) + ")" + leaf
+
+    return string
+
+
+def read_tree(node):
+    print(node[0])
+    if len(node[2]) == 0:
+        return node[0]
+    else:
+        for entry in node[2]:
+            read_tree(entry)
+        node = (node[0], node[1], [])
+        read_tree(node)
+
+
+
 def create_tree(leaves):
     """ Create tree from dictionary of leaves """
-    pass
+    string = ""
+    for node, children in leaves.items():
+        for child in children:
+            string += str(read_tree(child))
+
+    print(string)
 
 
 def convert_to_newick_format(tree):
@@ -201,7 +229,7 @@ def neighbor_joining(D, taxa):
     leaves = last_update_tree(leaves, S, D)
     print(leaves)
     tree = create_tree(leaves)
-
+    print(tree)
     return 0
 
 
@@ -217,6 +245,9 @@ def main():
     # draw the tree
     # Phylo.draw(tree)
     # Phylo.draw_ascii(tree)
+
+    tree2 = Phylo.read(io.StringIO("(A:0.160, (B:0.099, D:0.070)BD:0.04, (E:0.06, C:0.05)CE:0.05)ABDCE"), "newick")
+    Phylo.draw_ascii(tree2)
 
 
 if __name__ == '__main__':
