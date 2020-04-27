@@ -166,9 +166,16 @@ def neighbor_joining(D, taxa):
     while len(S) > 3:
         # 1. a) Compute matrix N
         N = calculate_matrix_N(S, D)
+        print("--------------------------")
+        print("Calculated N matrix")
+        print(S)
+        print(N)
 
         # 1. b) Select i, j such that it is a minimum entry in N
         i, j = find_neighbors(N)
+        print("\nDeleting indices " + taxa[i] + " and " + taxa[j] + " from D.")
+        print("Creating new taxon " + "'" + taxa[i] + taxa[j] + "'.")
+        print("--------------------------\n")
 
         # 2. Add new node k to the tree
         # 3. Add edges with weights to the tree
@@ -191,8 +198,14 @@ def main():
     file = "example_slide4.phy"
     print("Reading from " + file + ".\n")
     D, taxa  = load_distance_matrix(file)
+
+    # print information about the dissimilarity matrix
+    print("--------------------------")
+    print("Dissimilarity matrix")
     print(taxa)
-    print(D, "\n")
+    print(D)
+    print("--------------------------\n")
+
 
     # run the neighbor joining algorithm
     nj_tree = neighbor_joining(D, taxa)
