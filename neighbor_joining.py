@@ -108,7 +108,7 @@ def initialize_leaves(taxa, D):
     """ Create the initial tree from our given taxa """
     leaves = {}
     for taxon in taxa:
-        leaves[taxon] = Phylo.BaseTree.Clade(branch_length=0.0, name=taxon)
+        leaves[taxon] = []
 
     return leaves
 
@@ -199,6 +199,7 @@ def neighbor_joining(D, taxa):
 
     # Add new node v and edges to the tree
     leaves = last_update_tree(leaves, S, D)
+    print(leaves)
     tree = create_tree(leaves)
 
     return 0
