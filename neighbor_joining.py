@@ -104,29 +104,27 @@ def r(i, S, D):
     return sum(D[i, m] for m in range(n))  / (len(S) - 2)
 
 
-def tree_object(taxa):
-    """ Save name, parent and edge_weight for each taxon """
-    tree = {}
+def initialize_leaves(taxa, D):
+    """ Create the initial tree from our given taxa """
+    leaves = {}
     for taxon in taxa:
-        tree[taxon] = ["root", 0.0]
+        leaves[taxon] = Phylo.BaseTree.Clade(branch_length=0.0, name=taxon)
 
-    return tree
+    return leaves
 
 
-def update_tree_object(tree_obj, i, j, S, D):
+def update_leaves(leaves, i, j, S, D):
     """ Insert new nodes and update properties of the old nodes """
-    n, _ = D.shape
+    # add new nodes and children
+    edge_weight_i = 0.5 * (D[i, j] + r(i, S, D) - r(j, S, D))
+    edge_weight_j= D[i, j] - edge_weight_i
 
-    # add new taxon
-    tree_obj[S[i] + S[j]] = ["root", 0.0]
+    leaves[S[i] + S[j]] = [(S[i], edge_weight_i, leaves[S[i]]), (S[j], edge_weight_j, leaves[S[j]])]
 
-    # update old taxons with new parent and edge weights
-    edge_weight = 0.5 * (D[i, j] + r(i, S, D) - r(j, S, D))
-    tree_obj[S[i]] = [S[i] + S[j], edge_weight]
-    edge_weight = D[i, j] - edge_weight
-    tree_obj[S[j]] = [S[i] + S[j], edge_weight]
-
-    return tree_obj
+    # delete leaves i and j
+    del leaves[S[i]]
+    del leaves[S[j]]
+    return leaves
 
 
 def calculate_edge_weight(i, j, m, D):
@@ -134,25 +132,25 @@ def calculate_edge_weight(i, j, m, D):
     return (D[i, j] + D[i, m] - D[j, m]) / 2
 
 
-def last_update_tree_obj(tree_obj, S, D):
+def last_update_tree(leaves, S, D):
     """ Update tree after while loop has terminated """
+    # Add nodes and children
+    edge_weight_i = D[0, 1] + D[0, 2] - D[1, 2]
+    edge_weight_j = D[0, 1] + D[1, 2] - D[0, 2]
+    edge_weight_k = D[0, 2] + D[1, 2] - D[0, 1]
+
     # Add new node v
-    v = ""
-    for taxon in S:
-        v += taxon
-    tree_obj[v] = ["root", 0.0]
+    leaves[S[0]+S[1]+S[2]] = [(S[0], edge_weight_i, leaves[S[0]]), (S[1], edge_weight_j, leaves[S[1]]), (S[2], edge_weight_k, leaves[S[2]])]
 
-    # Add new weights
-    edge_weight = D[0, 1] + D[0, 2] - D[1, 2]
-    tree_obj[S[0]] = [v, edge_weight]
+    del leaves[S[0]]
+    del leaves[S[1]]
+    del leaves[S[2]]
+    return leaves
 
-    edge_weight = D[0, 1] + D[1, 2] - D[0, 2]
-    tree_obj[S[1]] = [v, edge_weight]
 
-    edge_weight = D[0, 2] + D[1, 2] - D[0, 1]
-    tree_obj[S[2]] = [v, edge_weight]
-
-    return tree_obj
+def create_tree(leaves):
+    """ Create tree from dictionary of leaves """
+    pass
 
 
 def convert_to_newick_format(tree):
@@ -165,7 +163,7 @@ def neighbor_joining(D, taxa):
     """ Creates an unrooted binary tree such that similar species are grouped in the
         same sub tree and the tree distances correspond to the distance matrix if possible """
     S = copy.deepcopy(taxa)
-    tree_obj = tree_object(taxa)
+    leaves = initialize_leaves(taxa, D)
 
     while len(S) > 3:
         # print information about the dissimilarity matrix
@@ -191,7 +189,7 @@ def neighbor_joining(D, taxa):
 
         # 2. Add new node k to the tree
         # 3. Add edges with weights to the tree
-        tree_obj = update_tree_object(tree_obj, i, j, S, D)
+        leaves = update_leaves(leaves, i, j, S, D)
 
         # 4. Update the dissimilarity matrix
         D = update_dissimilarity_matrix(S, D, i, j)
@@ -200,9 +198,10 @@ def neighbor_joining(D, taxa):
         S = update_S(S, i, j)
 
     # Add new node v and edges to the tree
-    tree_obj = last_update_tree_obj(tree_obj, S, D)
-    # print(tree_obj)
-    return convert_to_newick_format(tree_obj)
+    leaves = last_update_tree(leaves, S, D)
+    tree = create_tree(leaves)
+
+    return 0
 
 
 def main():
