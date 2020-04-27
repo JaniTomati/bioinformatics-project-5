@@ -104,26 +104,19 @@ def r(i, S, D):
     return sum(D[i, m] for m in range(n))  / (len(S) - 2)
 
 
-def initialize_leaves(taxa, D):
-    """ Create the initial tree from our given taxa """
-    leaves = {}
-    for taxon in taxa:
-        leaves[taxon] = []
-
-    return leaves
-
-
 def update_leaves(leaves, i, j, S, D):
     """ Insert new nodes and update properties of the old nodes """
     # add new nodes and children
     edge_weight_i = 0.5 * (D[i, j] + r(i, S, D) - r(j, S, D))
     edge_weight_j= D[i, j] - edge_weight_i
 
-    leaves[S[i] + S[j]] = [(S[i], edge_weight_i, leaves[S[i]]), (S[j], edge_weight_j, leaves[S[j]])]
+    if S[i] not in leaves:
+        leaves[S[i]] = Phylo.BaseTree.Clade(branch_length=edge_weight_i, name=S[i])
+    if S[j] not in leaves:
+        leaves[S[j]] = Phylo.BaseTree.Clade(branch_length=edge_weight_j, name=S[j])
 
-    # delete leaves i and j
-    del leaves[S[i]]
-    del leaves[S[j]]
+    combined = S[i] + S[j]
+    leaves[combined] = Phylo.BaseTree.Clade(branch_length=None, name=combined, clades=[leaves[S[i]], leaves[S[j]]])
     return leaves
 
 
@@ -132,66 +125,35 @@ def calculate_edge_weight(i, j, m, D):
     return (D[i, j] + D[i, m] - D[j, m]) / 2
 
 
-def last_update_tree(leaves, S, D):
+def create_tree(leaves, S, D):
     """ Update tree after while loop has terminated """
     # Add nodes and children
-    edge_weight_i = (D[0, 1] + D[0, 2] - D[1, 2]) / 2
-    edge_weight_j = (D[0, 1] + D[1, 2] - D[0, 2]) / 2
-    edge_weight_k = (D[0, 2] + D[1, 2] - D[0, 1]) / 2
+    edge_weights = []
+    edge_weights.append((D[0, 1] + D[0, 2] - D[1, 2]) / 2)
+    edge_weights.append((D[0, 1] + D[1, 2] - D[0, 2]) / 2)
+    edge_weights.append((D[0, 2] + D[1, 2] - D[0, 1]) / 2)
 
-    # Add new node v
-    leaves[S[0]+S[1]+S[2]] = [(S[0], edge_weight_i, leaves[S[0]]), (S[1], edge_weight_j, leaves[S[1]]), (S[2], edge_weight_k, leaves[S[2]])]
-
-    del leaves[S[0]]
-    del leaves[S[1]]
-    del leaves[S[2]]
-    return leaves
-
-
-def find_leaves(leaf, children):
-    string = ""
-    for child in children:
-        if len(child[2]) != 0:
-            string += find_leaves(child[0], child[2])
+    for i in range(len(S)):
+        if S[i] not in leaves:
+            leaves[S[i]] = Phylo.BaseTree.Clade(branch_length=edge_weights[i], name=S[i])
         else:
-            string += "(" + child[0] + ":" + str(child[1]) + ")" + leaf
+            leaves[S[i]] = Phylo.BaseTree.Clade(branch_length=edge_weights[i],
+                                                name=S[i],
+                                                clades=leaves[S[i]].clades)
 
-    return string
-
-
-def read_tree(node):
-    print(node[0])
-    if len(node[2]) == 0:
-        return node[0]
-    else:
-        for entry in node[2]:
-            read_tree(entry)
-        node = (node[0], node[1], [])
-        read_tree(node)
-
-
-
-def create_tree(leaves):
-    """ Create tree from dictionary of leaves """
-    string = ""
-    for node, children in leaves.items():
-        for child in children:
-            string += str(read_tree(child))
-
-    print(string)
-
-
-def convert_to_newick_format(tree):
-    """ Convert the tree object to newick format """
-    # return Phylo.read(io.StringIO(tree), "newick")
-    return 0
+    combined = S[0]+S[1]+S[2]
+    leaves[combined] = Phylo.BaseTree.Clade(branch_length=None,
+                                                name=combined,
+                                                clades=[leaves[S[0]], leaves[S[1]], leaves[S[2]]])
+    tree = Phylo.BaseTree.Tree(root=leaves[combined])
+    return tree
 
 
 def neighbor_joining(D, taxa):
     """ Creates an unrooted binary tree such that similar species are grouped in the
         same sub tree and the tree distances correspond to the distance matrix if possible """
     S = copy.deepcopy(taxa)
-    leaves = initialize_leaves(taxa, D)
+    leaves = {}
 
     while len(S) > 3:
         # print information about the dissimilarity matrix
@@ -226,11 +188,8 @@ def neighbor_joining(D, taxa):
         S = update_S(S, i, j)
 
     # Add new node v and edges to the tree
-    leaves = last_update_tree(leaves, S, D)
-    print(leaves)
-    tree = create_tree(leaves)
-    print(tree)
-    return 0
+    tree = create_tree(leaves, S, D)
+    return tree
 
 
 def main():
@@ -243,11 +202,17 @@ def main():
     nj_tree = neighbor_joining(D, taxa)
 
     # draw the tree
-    # Phylo.draw(tree)
-    # Phylo.draw_ascii(tree)
+    # Phylo.draw(nj_tree)
+    print("--------------------------")
+    print("ASCII")
+    Phylo.draw_ascii(nj_tree)
+    print("--------------------------\n")
 
-    tree2 = Phylo.read(io.StringIO("(A:0.160, (B:0.099, D:0.070)BD:0.04, (E:0.06, C:0.05)CE:0.05)ABDCE"), "newick")
-    Phylo.draw_ascii(tree2)
+    # print tree in newick format
+    print("--------------------------")
+    print("Newick")
+    print(nj_tree.format("newick").strip())
+    print("--------------------------\n")
 
 
 if __name__ == '__main__':
