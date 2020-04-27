@@ -32,7 +32,7 @@ def load_distance_matrix(file):
         return np.array(D), taxa
 
 
-def calculate_matrix_N(D, S):
+def calculate_matrix_N(S, D):
     """ Calculate N as defined by Saitou and Nei """
     N = np.zeros(D.shape)
     n, _ = D.shape
@@ -40,7 +40,7 @@ def calculate_matrix_N(D, S):
     for i in range(n):
         for j in range(n):
             if i != j:
-                N[i, j] = D[i, j] - (1 / (len(S) - 2) * sum(D[i, m] for m in range(n)) + 1 / (len(S) - 2) * sum(D[j, m] for m in range(n)))
+                N[i, j] = D[i, j] - (r(i, S, D) + r(j, S, D))
 
     return N
 
@@ -62,19 +62,20 @@ def find_neighbors(N):
 
 def update_dissimilarity_matrix(D, i, j):
     """ Update the dissamilarity matrix """
-    D_ = np.delete(D, i, 0)
-    D_ = np.delete(D_, i, 1)
-    D_ = np.delete(D_, j - 1, 0) # shift j one to the left if i was already deleted
-    D_ = np.delete(D_, j - 1, 1)
+    # delete rows and columns for i and j
+    D_reduced = np.delete(D, i, 0)
+    D_reduced = np.delete(D_reduced, i, 1)
+    D_reduced = np.delete(D_reduced, j - 1, 0) # reduce j by one since i was already deleted
+    D_reduced = np.delete(D_reduced, j - 1, 1)
 
-    n, _ = D_.shape
+    n, _ = D_reduced.shape
 
-    D_new = np.zeros((n + 1, n + 1)) # append new row and column to D_
-    D_new[:n, :n] = D_
+    D_new = np.zeros((n + 1, n + 1)) # create D_new that with one more row and column
+    D_new[:n, :n] = D_reduced # fill D_new with D_reduced
 
     for m in range(n):
-        new_value = 1 / 2 * (D[i, m] + D[j, m] - D[i, j])
-        D_new[-1, m], D_new[m, -1]= new_value, new_value
+        new_vec = 0.5 * (D[i, m] + D[j, m] - D[i, j])
+        D_new[-1, m], D_new[m, -1]= new_vec, new_vec
 
     return D_new
 
@@ -88,9 +89,15 @@ def update_S(S, i, j):
     S.remove(taxon_i)
     S.remove(taxon_j)
 
-    # add new taxon "k"
+    # add new taxon "k" = str(i) + str(j)
     S.append(taxon_i + taxon_j)
     return S
+
+
+def r(i, S, D):
+    """ Calculate r_i = 1 / (|S| - 2) Σ D_i,m """
+    n, _ = D.shape
+    return sum(D[i, m] for m in range(n))  / (len(S) - 2)
 
 
 def tree_object(taxa):
@@ -110,7 +117,7 @@ def update_tree_object(tree_obj, i, j, S, D):
     tree_obj[S[i] + S[j]] = ["root", 0.0]
 
     # update old taxons with new parent and edge weights
-    edge_weight = 1/2 * (D[i, j] + 1 / (len(S) - 2) * (1 / (len(S) - 2)) * sum(D[i, k] for k in range(n)))
+    edge_weight = 0.5 * (D[i, j] + r(i, S, D) - r(j, S, D))
     tree_obj[S[i]] = [S[i] + S[j], edge_weight]
     edge_weight = D[i, j] - edge_weight
     tree_obj[S[j]] = [S[i] + S[j], edge_weight]
@@ -158,7 +165,7 @@ def neighbor_joining(D, taxa):
 
     while len(S) > 3:
         # 1. a) Compute matrix N
-        N = calculate_matrix_N(D, S)
+        N = calculate_matrix_N(S, D)
 
         # 1. b) Select i, j such that it is a minimum entry in N
         i, j = find_neighbors(N)
