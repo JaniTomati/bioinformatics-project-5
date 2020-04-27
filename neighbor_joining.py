@@ -1,10 +1,9 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-import io
+
 import copy
 import numpy as np
-import networkx as nx
 from Bio import Phylo
 
 
